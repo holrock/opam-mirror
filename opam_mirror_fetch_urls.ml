@@ -70,7 +70,7 @@ let rec fetch ofile uri checksum pbar =
   | `OK -> (*    eprintf "%s %s\n%!" (yellow "GET:") url; *)
     Lwt_io.with_file ~mode:Lwt_io.output ofile
       (fun oc ->
-        Cohttp_lwt_body.to_stream body |>
+        Cohttp_lwt.Body.to_stream body |>
         Lwt_stream.iter_s (fun b ->
           lenread := Int64.add !lenread (Int64.of_int (String.length b));
           let progress = (Int64.to_float !lenread) /. (Int64.to_float len) in

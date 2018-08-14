@@ -15,7 +15,7 @@ Executable "opam-mirror"
   Custom:             true
   CompiledObject:     best
   Install:            true
-  BuildDepends:       cmdliner, cohttp.lwt, lwt.unix, lambda-term
+  BuildDepends:       cmdliner, cohttp.lwt, lwt.unix, lambda-term, threads
 
 Executable "opam-get-mirror-urls"
   Path:               .
@@ -23,5 +23,5 @@ Executable "opam-get-mirror-urls"
   Custom:             true
   CompiledObject:     best
   Install:            false
-  BuildDepends:       cmdliner, opam-lib, uri
+  BuildDepends:       cmdliner, opam-lib, uri, opam-lib.repository, threads
 

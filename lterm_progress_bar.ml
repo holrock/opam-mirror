@@ -34,17 +34,17 @@ let progress_bar term {label; progress} =
   let open LTerm in
   let open LTerm_text in
   let open LTerm_style in
-  let pbuf = Bytes.make prog '=' in
+  let pbuf = String.make prog '=' in
   let pcol = if progress < 0.33 then lred else if progress < 0.66 then lyellow else lgreen in
   let pspace = Bytes.make (cols-prog) ' ' in
   if cols-prog > 0 then Bytes.set pspace (Bytes.length pspace - 1) '|';
-  let label = if Bytes.length label > 20 then Bytes.sub label 0 20 else label in
+  let label = if String.length label > 20 then String.sub label 0 20 else label in
   let label = Printf.sprintf "%-20s" label in
   fprintls term (eval [
       B_reverse true; S label; E_reverse;
       S "|"; B_fg pcol; S pbuf;
       E_fg; B_bold true; S ">"; E_bold;
-      S pspace; S "\r"])
+      S (Bytes.to_string pspace); S "\r"])
 
 let label {label} = label
 let progress {progress} = progress

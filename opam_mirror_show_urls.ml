@@ -17,7 +17,7 @@
 
 let get_urls dir =
   Sys.chdir dir;
-  let repo = OpamRepository.local (OpamFilename.Dir.of_string dir) in
+  let repo = OpamRepositoryBackend.local (OpamFilename.Dir.of_string dir) in
   let packages = OpamRepository.packages_with_prefixes repo in
   OpamPackage.Map.fold
     (fun nv prefix map ->
@@ -25,7 +25,7 @@ let get_urls dir =
       let subdir =
         Printf.sprintf "distfiles/%s/%s.%s/" name name
           (OpamPackage.(Version.to_string (version nv))) in
-      let url_file = OpamPath.Repository.url repo prefix nv in 
+      let url_file = OpamRepositoryPath.url repo prefix nv in
       match OpamFilename.exists url_file with
       | true ->
         let file = OpamFile.URL.read url_file in
