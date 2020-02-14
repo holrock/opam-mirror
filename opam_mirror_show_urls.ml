@@ -16,8 +16,8 @@
  *)
 
 let get_urls dir =
-  Sys.chdir dir;
-  let repo = OpamRepositoryBackend.local (OpamFilename.Dir.of_string dir) in
+  let opam_dir = OpamFilename.Dir.of_string dir in
+  let repo = OpamRepositoryBackend.local opam_dir in
   let packages = OpamRepository.packages_with_prefixes repo in
   OpamPackage.Map.fold
     (fun nv prefix map ->
@@ -25,14 +25,19 @@ let get_urls dir =
       let subdir =
         Printf.sprintf "distfiles/%s/%s.%s/" name name
           (OpamPackage.(Version.to_string (version nv))) in
-      let url_file = OpamRepositoryPath.url repo prefix nv in
-      match OpamFilename.exists url_file with
-      | true ->
-        let file = OpamFile.URL.read url_file in
-        let address = fst (OpamFile.URL.url file) |> Uri.of_string in 
-        let checksum = OpamFile.URL.checksum file in
-        (subdir, address, checksum) :: map
-      | false -> map
+      let opam_file = OpamRepositoryPath.opam opam_dir prefix nv in
+      if OpamFile.exists opam_file then
+        let file = OpamFile.OPAM.read opam_file in
+        match OpamFile.OPAM.url file with
+        | Some url -> 
+          let address = OpamFile.URL.url url |> OpamUrl.to_string |> Uri.of_string in 
+          (match OpamFile.URL.checksum url with
+          | [] -> (subdir, address, None) :: map
+          | hd :: _ -> 
+          let checksum = OpamHash.to_string hd in
+          (subdir, address, Some checksum) :: map)
+        | None -> map
+      else map
     ) packages []
 
 open Cmdliner
@@ -47,7 +52,7 @@ let uri =
   Arg.(required & pos 0 (some loc) None & info [] ~docv:"DIR"
          ~doc:"Git directory of OPAM repository to mirror distfiles into")
 
-let run (_,uris) =
+let run (_, uris) =
   List.iter (fun (subdir, address, csum) ->
     Printf.printf "%s\n%s\n%s\n" subdir
       (Uri.to_string address)
@@ -67,7 +72,7 @@ let cmd =
     `P "$(b,opam)(1)" ]
   in
   Term.(pure run $ uri),
-  Term.info "opam-get-mirror-urls" ~version:"1.0.0" ~doc ~man
+  Term.info "opam_get_mirror_urls" ~version:"1.0.0" ~doc ~man
 
 let () =
   match Term.eval cmd
