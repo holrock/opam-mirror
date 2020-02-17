@@ -1,3 +1,13 @@
 (executables
-  (names opam_mirror_show_urls opam_mirror_fetch_urls)
-  (libraries cmdliner uri opam-repository cohttp-lwt-unix lwt lambda-term threads))
+  (names
+    opam_mirror_show_urls
+    opam_mirror_fetch_urls)
+  (libraries
+    cmdliner
+    uri
+    opam-repository
+    cohttp-lwt-unix
+    lwt
+    lambda-term
+    threads
+    sha))

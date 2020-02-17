@@ -29,11 +29,11 @@ let get_urls dir =
       if OpamFile.exists opam_file then
         let file = OpamFile.OPAM.read opam_file in
         match OpamFile.OPAM.url file with
-        | Some url -> 
+        | Some url ->
           let address = OpamFile.URL.url url |> OpamUrl.to_string |> Uri.of_string in 
           (match OpamFile.URL.checksum url with
           | [] -> (subdir, address, None) :: map
-          | hd :: _ -> 
+          | hd :: _ ->
           let checksum = OpamHash.to_string hd in
           (subdir, address, Some checksum) :: map)
         | None -> map
@@ -56,7 +56,7 @@ let run (_, uris) =
   List.iter (fun (subdir, address, csum) ->
     Printf.printf "%s\n%s\n%s\n" subdir
       (Uri.to_string address)
-      (match csum with None ->"" | Some c -> c)
+      (match csum with None -> "" | Some c -> c)
   ) uris
 
 let cmd =

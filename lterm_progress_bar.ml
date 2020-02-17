@@ -24,7 +24,7 @@ type t = {
 
 let cols ?(max=58) term =
   LTerm.get_size term >|= fun size ->
-  min max size.LTerm_geom.cols 
+  min max size.LTerm_geom.cols
 
 let progress_bar term {label; progress} =
   let label = match label with None -> "" | Some l -> l in
@@ -46,8 +46,8 @@ let progress_bar term {label; progress} =
       E_fg; B_bold true; S ">"; E_bold;
       S (Bytes.to_string pspace); S "\r"])
 
-let label {label} = label
-let progress {progress} = progress
+let label {label; _} = label
+let progress {progress; _} = progress
 
 let make ?label ?(progress=0.0) () = {label; progress}
 
@@ -59,15 +59,15 @@ let draw ?term tl =
   (match term with None -> Lazy.force LTerm.stdout | Some t -> return t) >>= fun term ->
   Lwt_list.iter_s (progress_bar term) tl >>= fun () ->
   LTerm.move term (List.length tl * (-1)) 0
- 
-let test () =
+
+let _test () =
   let t =
     Lazy.force LTerm.stdout >>= fun term ->
     let x = ref 0.0 in
     let t1 = make ~label:"foo" () in
     let t2 = make ~label:"bar" () in
     let rec aux t1 t2 =
-      cols term >>= fun cols ->
+      cols term >>= fun _cols ->
       update ~progress:!x t1;
       update ~progress:(!x+.0.2) t2;
       draw [t1;t2] >>= fun () ->

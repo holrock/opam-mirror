@@ -37,7 +37,7 @@ let rec mkdir_p dir =
   | true -> return_unit
   | false ->
     mkdir_p (Filename.dirname dir) >>= fun () ->
-    (try Unix.mkdir dir 0o700 
+    (try Unix.mkdir dir 0o700
      with Unix.Unix_error (Unix.EEXIST,_,_) -> ());
     return_unit
 
@@ -58,6 +58,27 @@ let red fmt = Printf.sprintf ("\027[31m"^^fmt^^"\027[m")
 let green fmt = Printf.sprintf ("\027[32m"^^fmt^^"\027[m")
 let yellow fmt = Printf.sprintf ("\027[33m"^^fmt^^"\027[m")
 
+let compare_digest checksum ofile =
+  match String.split_on_char '=' checksum with
+  | kind :: checksum' :: [] ->
+    begin match kind with
+    | "md5" -> String.equal Digest.(to_hex (file ofile)) checksum'
+    | "sha256" -> String.equal Sha256.(to_hex (file ofile)) checksum'
+    | "sha512" -> String.equal Sha512.(to_hex (file ofile)) checksum'
+    | _ -> eprintf "%s Can't parse checksum (%s) for %s.\n%!" (red "ERR:") checksum ofile;
+           false
+    end
+  | _ -> eprintf "%s Can't parse checksum (%s) for %s.\n%!" (red "ERR:") checksum ofile;
+         false
+
+let is_exist checksum ofile =
+  if Sys.file_exists ofile then
+    match checksum with
+    | Some c -> compare_digest c ofile
+    | None -> false
+  else
+    false
+
 let rec fetch ofile uri checksum pbar =
   let url = Uri.to_string uri in
   Cohttp_lwt_unix.Client.get uri >>= fun (resp,body) ->
@@ -66,7 +87,7 @@ let rec fetch ofile uri checksum pbar =
     | None -> 1000000L (* guess length for progress bar *)
     | Some l -> l in
   let lenread = ref 0L in
-  match Cohttp.Response.status resp with 
+  match Cohttp.Response.status resp with
   | `OK -> (*    eprintf "%s %s\n%!" (yellow "GET:") url; *)
     Lwt_io.with_file ~mode:Lwt_io.output ofile
       (fun oc ->
@@ -79,16 +100,15 @@ let rec fetch ofile uri checksum pbar =
         )
       )
     >>= fun () ->
-    begin match checksum with
-    | None -> eprintf "%s No checksum for %s\n%!" (yellow "MD5:") ofile
-    | Some c ->
-      let md5 = Digest.(to_hex (file ofile)) in
-      if md5 <> c then
-        eprintf "%s Checksum mismatch for %s. Expected %s, got %s\n%!"
-          (red "ERR:") ofile c md5
-      else (* eprintf "%s %s\n%!" (green "OK: ") ofile;*) ()
-    end;
-    return_unit
+      begin match checksum with
+      | None -> eprintf "%s No checksum for %s\n%!" (yellow "Checksum:") ofile
+      | Some c ->
+        if compare_digest c ofile then ()
+        else
+          eprintf "%s Checksum mismatch for %s. Expected %s\n%!"
+            (red "ERR:") ofile c
+      end;
+      return_unit
   | `Moved_permanently | `Found -> begin
       match Cohttp.(Header.get (Response.headers resp) "location") with
       | None -> eprintf "%s Bad Found: %s\n" (red "ERR:") url; return_unit
@@ -113,17 +133,21 @@ let run (_,uris) threads odir =
       PB.update ~label ~progress:((float !fin_uris) /. (float total_uris)) pbar;
       async (fun () -> (PB.draw (pbar::!pactive)))
     ) in
+
     Lwt_list.iter_p (fun (subdir, uri, checksum) ->
         Lwt_pool.use pool (fun () ->
             Lwt.catch (fun () ->
                 mkdir_p subdir >>= fun () ->
                 let fname = Uri.path uri |> Filename.basename in
-                let pbar = PB.make ~label:fname () in
-                add_pbar pbar;
-                fetch (subdir ^ fname) uri checksum pbar >>= fun () ->
-                remove_pbar pbar;
-                incr fin_uris;
-                return_unit
+                if is_exist checksum (subdir ^ fname) then return_unit
+                else begin
+                  let pbar = PB.make ~label:fname () in
+                  add_pbar pbar;
+                  fetch (subdir ^ fname) uri checksum pbar >>= fun () ->
+                  remove_pbar pbar;
+                  incr fin_uris;
+                  return_unit
+                end
               ) (fun exn ->
                 Printf.eprintf "%s: %s %s\n%!" (red "EXC:") (Uri.to_string uri) (Printexc.to_string exn);
                 return_unit
@@ -169,7 +193,7 @@ let cmd =
     `P "$(b,opam)(1), $(b,opam-mirror-show-urls)(1)" ]
   in
   Term.(pure run $ uri $ parallel $ odir),
-  Term.info "opam-mirror" ~version:"1.0.0" ~doc ~man
+  Term.info "opam_mirror_fetch_urls" ~version:"1.0.0" ~doc ~man
 
 let () =
   match Term.eval cmd
