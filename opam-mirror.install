@@ -1,0 +1,14 @@
+lib: [
+  "_build/install/default/lib/opam-mirror/META"
+  "_build/install/default/lib/opam-mirror/dune-package"
+  "_build/install/default/lib/opam-mirror/opam"
+]
+bin: [
+  "_build/install/default/bin/opam_mirror_fetch_urls"
+  "_build/install/default/bin/opam_mirror_rewrite_urls"
+  "_build/install/default/bin/opam_mirror_show_urls"
+]
+doc: [
+  "_build/install/default/doc/opam-mirror/CHANGES.md"
+  "_build/install/default/doc/opam-mirror/README.md"
+]
