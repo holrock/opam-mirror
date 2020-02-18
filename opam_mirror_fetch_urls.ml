@@ -58,26 +58,44 @@ let red fmt = Printf.sprintf ("\027[31m"^^fmt^^"\027[m")
 let green fmt = Printf.sprintf ("\027[32m"^^fmt^^"\027[m")
 let yellow fmt = Printf.sprintf ("\027[33m"^^fmt^^"\027[m")
 
+type checksum_result =
+  | Matched
+  | Mismatched of string
+  | Parse_error
+
 let compare_digest checksum ofile =
   match String.split_on_char '=' checksum with
   | kind :: checksum' :: [] ->
     begin match kind with
-    | "md5" -> String.equal Digest.(to_hex (file ofile)) checksum'
-    | "sha256" -> String.equal Sha256.(to_hex (file ofile)) checksum'
-    | "sha512" -> String.equal Sha512.(to_hex (file ofile)) checksum'
-    | _ -> eprintf "%s Can't parse checksum (%s) for %s.\n%!" (red "ERR:") checksum ofile;
-           false
+    | "md5" -> if String.equal Digest.(to_hex (file ofile)) checksum' then Matched else Mismatched checksum
+    | "sha256" -> if String.equal Sha256.(to_hex (file ofile)) checksum' then Matched else Mismatched checksum
+    | "sha512" -> if String.equal Sha512.(to_hex (file ofile)) checksum' then Matched else Mismatched checksum
+    | _ -> Parse_error
     end
-  | _ -> eprintf "%s Can't parse checksum (%s) for %s.\n%!" (red "ERR:") checksum ofile;
-         false
+  | _ -> Parse_error
 
 let is_exist checksum ofile =
   if Sys.file_exists ofile then
     match checksum with
-    | Some c -> compare_digest c ofile
+    | Some c ->
+      begin match compare_digest c ofile with
+      | Matched ->
+        Printf.eprintf "%s is already downloaded\n%!" ofile;
+        true
+      | Mismatched fc ->
+        eprintf "%s Checksum mismatch for %s. Expected %s, got %s\n%!"
+          (red "ERR:") ofile c fc;
+        false
+      | Parse_error ->
+        eprintf "%s Checksum can't parse for %s, got %s\n%!"
+          (red "ERR:") ofile c;
+        false
+      end
     | None -> false
   else
     false
+
+let fname uri = Uri.path uri |> Filename.basename
 
 let rec fetch ofile uri checksum pbar =
   let url = Uri.to_string uri in
@@ -103,10 +121,15 @@ let rec fetch ofile uri checksum pbar =
       begin match checksum with
       | None -> eprintf "%s No checksum for %s\n%!" (yellow "Checksum:") ofile
       | Some c ->
-        if compare_digest c ofile then ()
-        else
-          eprintf "%s Checksum mismatch for %s. Expected %s\n%!"
+        begin match compare_digest c ofile with
+        | Matched -> ()
+        | Mismatched c' ->
+          eprintf "%s Checksum mismatch for %s. Expected %s, got %s\n%!"
+            (red "ERR:") ofile c c'
+        | Parse_error ->
+          eprintf "%s Checksum can't parse for %s, got %s\n%!"
             (red "ERR:") ofile c
+        end
       end;
       return_unit
   | `Moved_permanently | `Found -> begin
@@ -120,6 +143,7 @@ let rec fetch ofile uri checksum pbar =
 
 let run (_,uris) threads odir =
   Sys.chdir odir;
+  let uris = List.filter (fun (subdir, uri, checksum) -> not (is_exist checksum (subdir ^ (fname uri)))) uris in
   Lwt_main.run (
     let pbar = PB.make () in
     let pactive = ref [] in
@@ -138,7 +162,7 @@ let run (_,uris) threads odir =
         Lwt_pool.use pool (fun () ->
             Lwt.catch (fun () ->
                 mkdir_p subdir >>= fun () ->
-                let fname = Uri.path uri |> Filename.basename in
+                let fname = fname uri in
                 if is_exist checksum (subdir ^ fname) then return_unit
                 else begin
                   let pbar = PB.make ~label:fname () in
