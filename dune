@@ -1,7 +1,8 @@
 (executables
   (names
     opam_mirror_show_urls
-    opam_mirror_fetch_urls)
+    opam_mirror_fetch_urls
+    opam_mirror_rewrite_urls)
   (libraries
     cmdliner
     uri
